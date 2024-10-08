@@ -97,8 +97,8 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-	int64_t awake_ticks;				/* awake ticks */
-                                                                                                                                                                                                                                                                                                                                                                                                    
+	int64_t wakeup_ticks;								/* wakeup ticks */
+
 	/* Shared between thread.c and synch.c(semaphore->waiters). */
 	struct list_elem elem;              /* List element. */
 

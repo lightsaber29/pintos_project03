@@ -259,7 +259,7 @@ void test_max_priority(void) {
 bool cmp_priority_wait(const struct list_elem* A, const struct list_elem *B, void *aux) {
     struct thread *thread_a = list_entry(A, struct thread, elem);
     struct thread *thread_b = list_entry(B, struct thread, elem);
-    return thread_a->awake_ticks < thread_b->awake_ticks;
+    return thread_a->wakeup_ticks < thread_b->wakeup_ticks;
 }
 
 bool cmp_priority_ready(const struct list_elem* A, const struct list_elem *B, void *aux) {
@@ -270,7 +270,7 @@ bool cmp_priority_ready(const struct list_elem* A, const struct list_elem *B, vo
 
 /* wait_list에서 ready_list로 옮기기 */
 void thread_awake(int64_t ticks) {
-	while (!list_empty(&wait_list) && list_entry(list_front(&wait_list), struct thread, elem)->awake_ticks <= ticks) {
+	while (!list_empty(&wait_list) && list_entry(list_front(&wait_list), struct thread, elem)->wakeup_ticks <= ticks) {
 		struct thread* awake_thread = list_entry(list_pop_front(&wait_list), struct thread, elem);
 		// curr -> status를 ready로 바꿔준다. block, unblock 함수 그대로 이용
 		// ready에 넣어줄 때도 list order로 넣어줘야 한다.

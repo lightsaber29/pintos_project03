@@ -102,11 +102,11 @@ timer_sleep (int64_t ticks) {
 	int64_t start = timer_ticks ();
 
 	ASSERT (intr_get_level () == INTR_ON);
-	int64_t awake_ticks = start + ticks;
+	int64_t wakeup_ticks = start + ticks;
 
-	// 현재 스레드의 awake_ticks를 넣어주고, wait_list에 넣어주고, block 처리(스레드 상태 변경)를 해준다.
+	// 현재 스레드의 wakeup_ticks를 넣어주고, wait_list에 넣어주고, block 처리(스레드 상태 변경)를 해준다.
 	struct thread* curr = thread_current(); // running_thread 랑 고민됨..
-	curr->awake_ticks = awake_ticks;
+	curr->wakeup_ticks = wakeup_ticks;
 	thread_wait();
 
 	// pooling 방식을 interrupt 방식으로 변경함에 따라 주석 처리
