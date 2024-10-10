@@ -2,6 +2,7 @@
 #define VM_VM_H
 #include <stdbool.h>
 #include "threads/palloc.h"
+#include "include/lib/kernel/hash.h"
 
 enum vm_type {
 	/* page not initialized */
@@ -85,7 +86,31 @@ struct page_operations {
  * We don't want to force you to obey any specific design for this struct.
  * All designs up to you for this. */
 struct supplemental_page_table {
+	/** vm_entry 를 관리하는 테이블: 해시 구현 */
+	struct hash page_table;  // 해시 테이블로 페이지를 관리
 };
+
+struct vm_entry {
+	uint8_t type; /* VM_BIN, VM_FILE, VM_ANON의 타입 */
+	void *vaddr; /* vm_entry의 가상페이지 번호 */
+	bool writable; /* True일 경우 해당 주소에 write 가능
+					False일 경우 해당 주소에 write 불가능 */
+
+	bool is_loaded; /* 물리메모리의 탑재 여부를 알려주는 플래그 */
+	struct file* file; /* 가상주소와 맵핑된 파일 */
+	/* Memory Mapped File 에서 다룰 예정 */
+
+	struct list_elem mmap_elem; /* mmap 리스트 element */
+	size_t offset; /* 읽어야 할 파일 오프셋 */
+	size_t read_bytes; /* 가상페이지에 쓰여져 있는 데이터 크기 */
+	size_t zero_bytes; /* 0으로 채울 남은 페이지의 바이트 */
+
+	/* Swapping 과제에서 다룰 예정 */
+	size_t swap_slot; /* 스왑 슬롯 */
+
+	/* ‘vm_entry들을 위한 자료구조’ 부분에서 다룰 예정 */
+	struct hash_elem elem; /* 해시 테이블 Element */
+}
 
 #include "threads/thread.h"
 void supplemental_page_table_init (struct supplemental_page_table *spt);
@@ -95,7 +120,7 @@ void supplemental_page_table_kill (struct supplemental_page_table *spt);
 struct page *spt_find_page (struct supplemental_page_table *spt,
 		void *va);
 bool spt_insert_page (struct supplemental_page_table *spt, struct page *page);
-void spt_remove_page (struct supplemental_page_table *spt, struct page *page);
+bool spt_remove_page (struct supplemental_page_table *spt, struct page *page);
 
 void vm_init (void);
 bool vm_try_handle_fault (struct intr_frame *f, void *addr, bool user,
