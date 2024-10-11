@@ -3,6 +3,7 @@
 #include "threads/malloc.h"
 #include "vm/vm.h"
 #include "vm/inspect.h"
+#include "threads/vaddr.h"
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -40,21 +41,47 @@ static struct frame *vm_evict_frame (void);
 /* Create the pending page object with initializer. If you want to create a
  * page, do not create it directly and make it through this function or
  * `vm_alloc_page`. */
+// pending 중인 페이지 객체를 초기화하고 생성합니다.
+// 페이지를 생성하려면 직접 생성하지 말고 이 함수나 vm_alloc_page를 통해 만드세요.
+// init과 aux는 첫 page fault가 발생할 때 호출된다.
 bool
 vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 		vm_initializer *init, void *aux) {
 
-	ASSERT (VM_TYPE(type) != VM_UNINIT)
+	// ASSERT (VM_TYPE(type) != VM_UNINIT)
 
 	struct supplemental_page_table *spt = &thread_current ()->spt;
 
 	/* Check wheter the upage is already occupied or not. */
 	if (spt_find_page (spt, upage) == NULL) {
-		/* TODO: Create the page, fetch the initialier according to the VM type,
-		 * TODO: and then create "uninit" page struct by calling uninit_new. You
+
+		/* TODO: Create the page, fetch the initialier according to the VM type,*/
+		// 페이지를 생성하고,
+		struct page *p = (struct page *)malloc(sizeof(struct page));
+		// VM 유형에 따라 초기화 함수를 가져와서
+		bool (*page_initializer)(struct page *, enum vm_type, void *);
+
+		switch (VM_TYPE(type)) {
+			case VM_ANON:
+				page_initializer = anon_initializer;
+				break;
+			case VM_FILE:
+				page_initializer = file_backed_initializer;
+				break;
+			default:
+				// uninit_initialize
+				break;
+		}
+		/* TODO: and then create "uninit" page struct by calling uninit_new. You
 		 * TODO: should modify the field after calling the uninit_new. */
+		// uninit_new를 호출해 "uninit" 페이지 구조체를 생성하세요.
+		uninit_new(p, upage, init, type, aux, page_initializer);
+
+		// uninit_new를 호출한 후에는 필드를 수정해야 합니다.
+		p->writable = writable;
 
 		/* TODO: Insert the page into the spt. */
+		return spt_insert_page(spt, p);
 	}
 err:
 	return false;
@@ -167,9 +194,25 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
-	/* TODO: Your code goes here */
+	if (addr == NULL)
+		return false;
 
-	return vm_do_claim_page (page);
+	if (is_kernel_vaddr(addr))
+		return false;
+
+	/* TODO: Your code goes here */
+	// 접근한 메모리의 physical page가 존재하지 않은 경우
+	if (not_present) {
+		page = spt_find_page(spt, addr);
+		if (page == NULL)
+			return false;
+
+		// write 불가능한 페이지에 write 요청한 경우
+		if (write == 1 && page->writable == 0)
+			return false;
+		return vm_do_claim_page(page);
+	}
+	return false;
 }
 
 /* Free the page.
