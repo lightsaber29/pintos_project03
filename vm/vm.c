@@ -64,14 +64,13 @@ err:
 // 인자로 받은 vaddr에 해당하는 vm_entry 를 검색 후 반환
 struct page *
 spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
-	struct vm_entry entry;
-	struct page *page = NULL;
+	struct page *page;
 	struct hash_elem *found_elem;
 	/* TODO: Fill this function. */
 	/* pg_round_down()으로 vaddr의 페이지 번호를 얻음 */
 	// 가상 메모리 주소에 해당하는 페이지 번호 추출
 	// #define pg_round_down(va) (void *) ((uint64_t) (va) & ~PGMASK)
-	entry.vaddr = pg_round_down(va);
+	page->va = pg_round_down(va);
 
 	// 모르는거!!
 	// hash_find 에 어떻게 va를 전달할 지
@@ -82,13 +81,13 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 
 	/* hash_find() 함수를 사용해서 hash_elem 구조체 얻음 */
 	// vm_entry 검색 후 반환
-	found_elem = hash_find(&spt->page_table, &entry.elem);
+	found_elem = hash_find(&spt->page_table, &page->hash_elem);
 	/* 만약 존재하지 않는다면 NULL 리턴 */
 	/* hash_entry()로 해당 hash_elem의 vm_entry 구조체 리턴 */
 
 	if (found_elem != NULL) {
 		// vm_entry 에서 page 를 어떻게 구할까?
-		return hash_entry(found_elem, struct vm_entry, elem);
+		return hash_entry(found_elem, struct page, hash_elem);
 	} else {
 		return NULL;
 	}
@@ -213,17 +212,17 @@ supplemental_page_table_init (struct supplemental_page_table *spt UNUSED) {
 
 uint64_t
 vm_entry_hash (const struct hash_elem *e, void *aux) {
-    struct vm_entry *entry = hash_entry(e, struct vm_entry, elem);
-    return hash_bytes(&entry->vaddr, sizeof(entry->vaddr));  // vaddr을 해시
+    struct page *page = hash_entry(e, struct page, hash_elem);
+    return hash_bytes(&page->va, sizeof(page->va));  // vaddr을 해시
 }
 
 bool
 vm_entry_less (const struct hash_elem *a, const struct hash_elem *b, void *aux) {
-    struct vm_entry *vme_a = hash_entry(a, struct vm_entry, elem);
-    struct vm_entry *vme_b = hash_entry(b, struct vm_entry, elem);
+    struct page *page_a = hash_entry(a, struct page, hash_elem);
+    struct page *page_b = hash_entry(b, struct page, hash_elem);
 
     /* 가상 주소가 더 작은 항목을 우선순위가 높다고 판단 */
-    return vme_a->vaddr < vme_b->vaddr;
+    return page_a->va < page_b->va;
 }
 
 /* Copy supplemental page table from src to dst */

@@ -775,6 +775,8 @@ install_page (void *upage, void *kpage, bool writable) {
  * If you want to implement the function for only project 2, implement it on the
  * upper block. */
 
+// 실행 가능한 파일의 페이지들을 초기화하는 함수
+// page fault가 발생할 때 호출
 static bool
 lazy_load_segment (struct page *page, void *aux) {
 	/* TODO: Load the segment from the file */

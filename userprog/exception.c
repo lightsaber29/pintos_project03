@@ -118,7 +118,9 @@ kill (struct intr_frame *f) {
    [IA32-v3a] section 5.15 "Exception and Interrupt Reference". */
 static void
 page_fault (struct intr_frame *f) {
+	// lazy_loading 또는 swapped page 에서 true
 	bool not_present;  /* True: not-present page, false: writing r/o page. */
+	// write 된 상태면 true
 	bool write;        /* True: access was write, false: access was read. */
 	bool user;         /* True: access by user, false: access by kernel. */
 	void *fault_addr;  /* Fault address. */
@@ -136,7 +138,7 @@ page_fault (struct intr_frame *f) {
 
 
 	/* Determine cause. */
-	not_present = (f->error_code & PF_P) == 0;
+	not_present = (f->error_code & PF_P) == 0; // 페이지가 메모리에 존재하지 않는 경우
 	write = (f->error_code & PF_W) != 0;
 	user = (f->error_code & PF_U) != 0;
 
@@ -150,13 +152,14 @@ page_fault (struct intr_frame *f) {
 	/* Count page faults. */
 	page_fault_cnt++;
 
-	/* If the fault is true fault, show info and exit. */
-	// printf ("Page fault at %p: %s error %s page in %s context.\n",
-	// 		fault_addr,
-	// 		not_present ? "not present" : "rights violation",
-	// 		write ? "writing" : "reading",
-	// 		user ? "user" : "kernel");
-	// kill (f);
 	exit(-1);
+	/* If the fault is true fault, show info and exit. */
+	printf ("Page fault at %p: %s error %s page in %s context.\n",
+			fault_addr,
+			not_present ? "not present" : "rights violation",
+			write ? "writing" : "reading",
+			user ? "user" : "kernel");
+	// TODO pdf 328쪽 kill 관련 코드 삭제하라고 되어있긴 함. 확인 필요
+	kill (f);
 }
 
