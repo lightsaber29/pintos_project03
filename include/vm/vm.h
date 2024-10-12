@@ -49,7 +49,7 @@ struct page {
 	/* Your implementation */
 	struct hash_elem hash_elem;
 	bool writable;
-	int mapped_page_count; // file_backed_page인 경우, 매핑에 사용한 페이지 개수 (매핑 해제 시 사용)
+	// int mapped_page_count; // file_backed_page인 경우, 매핑에 사용한 페이지 개수 (매핑 해제 시 사용)
 
 	/* Per-type data are binded into the union.
 	 * Each function automatically detects the current union */
@@ -124,7 +124,7 @@ void supplemental_page_table_kill (struct supplemental_page_table *spt);
 struct page *spt_find_page (struct supplemental_page_table *spt,
 		void *va);
 bool spt_insert_page (struct supplemental_page_table *spt, struct page *page);
-bool spt_remove_page (struct supplemental_page_table *spt, struct page *page);
+void spt_remove_page (struct supplemental_page_table *spt, struct page *page);
 
 void vm_init (void);
 bool vm_try_handle_fault (struct intr_frame *f, void *addr, bool user,

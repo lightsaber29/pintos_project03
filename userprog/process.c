@@ -879,6 +879,7 @@ setup_stack (struct intr_frame *if_) {
 		if (success)
 			// 3) rsp를 변경한다. (argument_stack에서 이 위치부터 인자를 push한다.)
 			if_->rsp = USER_STACK;
+			thread_current()->stack_bottom = stack_bottom;
 	}
 	return success;
 }
