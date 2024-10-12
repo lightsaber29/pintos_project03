@@ -102,16 +102,16 @@ static void
 anon_destroy (struct page *page) {
     struct anon_page *anon_page = &page->anon;
 
-    // 1. 스왑 슬롯 해제 (이 경우는 swap_slot이 존재하는 경우)
-    if (anon_page->slot_no != NULL) {
-        // 해당 스왑 슬롯을 해제합니다.
-        memset(&anon_page->slot_no, 0, sizeof(anon_page->slot_no));
-        anon_page->slot_no = NULL; // 스왑 슬롯 번호 초기화
-    }
+    // // 1. 스왑 슬롯 해제 (이 경우는 swap_slot이 존재하는 경우)
+    // if (anon_page->slot_no != NULL) {
+    //     // 해당 스왑 슬롯을 해제합니다.
+    //     memset(&anon_page->slot_no, 0, sizeof(anon_page->slot_no));
+    //     anon_page->slot_no = NULL; // 스왑 슬롯 번호 초기화
+    // }
 
-    // 2. 페이지와 관련된 자원 해제
-    palloc_free_page(page->frame->kva);  // 물리 메모리에서 할당된 페이지 해제
+    // // 2. 페이지와 관련된 자원 해제
+    // palloc_free_page(page->frame->kva);  // 물리 메모리에서 할당된 페이지 해제
 
-    // 3. 페이지의 frame과 관련된 자원 정리
-    page->frame = NULL; // 페이지와 프레임을 연결해제
+    // // 3. 페이지의 frame과 관련된 자원 정리
+    // page->frame = NULL; // 페이지와 프레임을 연결해제
 }

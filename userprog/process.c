@@ -793,6 +793,7 @@ lazy_load_segment (struct page *page, void *aux) {
 
     // 파일에서 읽어야 할 바이트만큼 메모리 페이지로 로드
     if (file_read (file_info->file, page->frame->kva, file_info->read_bytes) != (int) file_info->read_bytes) {
+		palloc_free_page(page->frame->kva);
         return false;
     }
 
@@ -833,20 +834,21 @@ load_segment (struct file *file, off_t ofs, uint8_t *upage,
 
 		/* TODO: Set up aux to pass information to the lazy_load_segment. */
 		// file 구조체에 정보를 담아서 aux 로 전달
-		struct file_page file_info;
-		file_info.file = file;
-		file_info.ofs = ofs;
-		file_info.read_bytes = read_bytes;
-		file_info.zero_bytes = zero_bytes;
-		void *aux = &file_info;
+		struct file_page *file_info = (struct file_page*)malloc(sizeof(struct file_page));
+		file_info->file = file;
+		file_info->ofs = ofs;
+		file_info->read_bytes = read_bytes;
+		file_info->zero_bytes = zero_bytes;
+
 		if (!vm_alloc_page_with_initializer (VM_ANON, upage,
-					writable, lazy_load_segment, aux))
+					writable, lazy_load_segment, file_info))
 			return false;
 
 		/* Advance. */
 		read_bytes -= page_read_bytes;
 		zero_bytes -= page_zero_bytes;
 		upage += PGSIZE;
+		ofs += page_read_bytes;
 	}
 	return true;
 }
@@ -878,5 +880,6 @@ setup_stack (struct intr_frame *if_) {
 			// 3) rsp를 변경한다. (argument_stack에서 이 위치부터 인자를 push한다.)
 			if_->rsp = USER_STACK;
 	}
+	return success;
 }
 #endif /* VM */
