@@ -23,7 +23,7 @@
 #include "vm/file.h"
 #endif
 
-static void process_cleanup (void);
+static void process_cleanup (bool is_exit);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
@@ -277,7 +277,8 @@ int process_exec(void *f_name) {
     _if.cs = SEL_UCSEG;
     _if.eflags = FLAG_IF | FLAG_MBS;
 
-    process_cleanup();
+		bool is_exit = false;
+    process_cleanup(is_exit);
 	
     success = load(parse[0], &_if);  // 첫 번째 인자(프로그램 이름)를 사용
     if (!success) {
@@ -405,7 +406,9 @@ void process_exit(void)
         close(i);
     palloc_free_page(curr->fd_table);
     file_close(curr->running); // 2) 현재 실행 중인 파일도 닫는다.
-    process_cleanup();
+
+		bool is_exit = true;
+    process_cleanup(true);
     // 3) 자식이 종료될 때까지 대기하고 있는 부모에게 signal을 보낸다.
     sema_up(&curr->wait_sema);
     // 4) 부모의 signal을 기다린다. 대기가 풀리고 나서 do_schedule(THREAD_DYING)이 이어져 다른 스레드가 실행된다.
@@ -415,11 +418,11 @@ void process_exit(void)
 
 /* Free the currrent process's resources. */
 static void
-process_cleanup (void) {
+process_cleanup (bool is_exit) {
 	struct thread *curr = thread_current ();
 
 #ifdef VM
-	supplemental_page_table_kill (&curr->spt);
+	supplemental_page_table_kill (&curr->spt, is_exit);
 #endif
 
 	uint64_t *pml4;

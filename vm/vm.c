@@ -320,9 +320,9 @@ void action_func(struct hash_elem *e, void *aux) {
 
 /* Free the resource hold by the supplemental page table */
 void
-supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED) {
+supplemental_page_table_kill (struct supplemental_page_table *spt UNUSED, bool is_exit) {
 	/* TODO: Destroy all the supplemental_page_table hold by thread and
 	 * TODO: writeback all the modified contents to the storage. */
-	// hash_destroy(&spt->page_table, hash_delete);
-	hash_clear(&spt->page_table, action_func);
+	hash_destroy(&spt->page_table, action_func, is_exit);
+	//hash_clear(&spt->page_table, action_func);
 }

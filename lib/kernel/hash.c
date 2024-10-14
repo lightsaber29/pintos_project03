@@ -78,10 +78,14 @@ hash_clear (struct hash *h, hash_action_func *destructor) {
    undefined behavior, whether done in DESTRUCTOR or
    elsewhere. */
 void
-hash_destroy (struct hash *h, hash_action_func *destructor) {
+hash_destroy (struct hash *h, hash_action_func *destructor, bool is_exit) {
 	if (destructor != NULL)
 		hash_clear (h, destructor);
-	free (h->buckets);
+
+	if (is_exit) {
+			// The supplemental page table has already been freed.
+			free (h->buckets);
+	}
 }
 
 /* Inserts NEW into hash table H and returns a null pointer, if
