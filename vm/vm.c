@@ -222,6 +222,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
+
 	if (addr == NULL)
 		return false;
 
@@ -230,6 +231,7 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 
 	struct thread *curr = thread_current();
 	//uint64_t *curr_stack_bottom = (uintptr_t *)curr->stack_bottom;
+
 
 	// 만약 커널 모드에서 발생한 page fault일 경우 page fault가 발생한 주소를 직접 설정해줘야 함
 	//addr = curr->tf.rsp;
