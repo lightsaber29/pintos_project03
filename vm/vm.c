@@ -221,11 +221,38 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 	struct supplemental_page_table *spt UNUSED = &thread_current ()->spt;
 	struct page *page = NULL;
 	/* TODO: Validate the fault */
+
 	if (addr == NULL)
 		return false;
 
 	if (is_kernel_vaddr(addr))
 		return false;
+
+	struct thread *curr = thread_current();
+	uint64_t *curr_stack_bottom = (uintptr_t *)curr->stack_bottom;
+	//printf("Fault at addr: %p, rsp: %p, stack bottom: %p\n", addr, f->rsp, (uintptr_t *)curr_stack_bottom);
+
+	// 만약 커널 모드에서 발생한 page fault일 경우 page fault가 발생한 주소를 직접 설정해줘야 함
+	//addr = curr->tf.rsp;
+
+	// stack overflow 검증
+		if (f->rsp - (uintptr_t)addr <= USER_STACK - *curr_stack_bottom) {
+        // 유효한 스택 확장 시도일 경우 스택을 확장
+        // 스택 페이지를 할당하는 로직
+    } else {
+        // 스택 오버플로우로 간주
+        return false;
+    }
+
+	// if (addr < curr_stack_bottom) {
+	// 		if (f->rsp - (uintptr_t)addr <= USER_STACK - *curr_stack_bottom) {
+  //       // 유효한 스택 확장 시도일 경우 스택을 확장
+  //       // 스택 페이지를 할당하는 로직
+  //   } else {
+  //       // 스택 오버플로우로 간주
+  //       return false;
+  //   }
+	// }
 
 	/* TODO: Your code goes here */
 	// 접근한 메모리의 physical page가 존재하지 않은 경우
