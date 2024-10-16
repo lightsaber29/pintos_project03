@@ -107,7 +107,6 @@ struct thread {
 	struct list donations;				
 	struct list_elem donation_elem;
 
-
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
@@ -116,6 +115,7 @@ struct thread {
 	/* Table for whole virtual memory owned by thread. */
 	struct supplemental_page_table spt;
 	void *stack_bottom;
+	void *rsp;
 #endif
 
 	/* Owned by thread.c. */

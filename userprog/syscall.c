@@ -71,6 +71,9 @@ syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
 	
 	int sys_number = f->R.rax;
+	#ifdef VM
+    thread_current()->rsp = f->rsp; // 추가
+	#endif
 	switch (sys_number){
 
 		case SYS_HALT:			/* Halt the operating system. */
@@ -143,11 +146,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 void
 check_address(void *addr){
-
-if (addr == NULL || !is_user_vaddr(addr)) {
-	//  printf("Invalid address: %p\n", addr);
-    exit(-1);
-}
+	struct thread *curr = thread_current();
+	if (addr == NULL || !is_user_vaddr(addr)) {
+		// pml4_get_page(curr->pml4, addr) == NULL
+			exit(-1);
+	}
 }
 
 void 
