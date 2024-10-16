@@ -23,7 +23,7 @@
 #include "vm/file.h"
 #endif
 
-static void process_cleanup (void);
+static void process_cleanup (bool is_exit);
 static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
@@ -101,7 +101,7 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	sema_down(&child->load_sema); 
 
 	
-	// fork 오류나서 추가한 부분(debug)
+	// fork 오류나서 추가한 부분(debug) // TID_ERROR랑 비교해야 되는지 확인 필요...
 	if (child->exit_status == -1){
 		return TID_ERROR;
 	}
@@ -252,22 +252,12 @@ int process_exec(void *f_name) {
     bool success;
 		char *saveptr;
     char *token;
-    char *parse[30];  // 파싱한 인자들을 저장할 배열
+    char *parse[30]; 
     int index = 0;
 
-		// for (token = strtok_r (file_name, " ", &saveptr); token != NULL; 
-		// token = strtok_r (NULL, " ", &saveptr)){
-			
-		// 	parse[index] = token;
-		// 	index++;
-
-		// }
-
 		token = strtok_r(file_name, " ", &saveptr);
-		//printf("Tokenized argument 0: %p\n", &token);
     while (token != NULL && index < 30) {
         parse[index] = token;
-				//printf("Tokenized argument %d: %s\n", index, parse[index]);
 				index++;
         token = strtok_r(NULL, " ", &saveptr);
     }
@@ -277,18 +267,17 @@ int process_exec(void *f_name) {
     _if.cs = SEL_UCSEG;
     _if.eflags = FLAG_IF | FLAG_MBS;
 
-    process_cleanup();
+		bool is_exit = false;
+    process_cleanup(is_exit);
 	
-    success = load(parse[0], &_if);  // 첫 번째 인자(프로그램 이름)를 사용
+    success = load(parse[0], &_if);
     if (!success) {
         palloc_free_page(parse[0]);
         return -1;
     }
 
-    argument_stack(parse, index, &_if.rsp);  // 인자를 스택에 적재
-    // hex_dump(_if.rsp, _if.rsp, USER_STACK -_if.rsp, true); // user stack을 16진수로 프린트
+    argument_stack(parse, index, &_if.rsp);
 
-		// rdi에는 인자의 개수(argc)를 담고, rsi에는 첫 번째 인자의 주소가 저장되어 있는 스택에서의 주소를 담음
 		_if.R.rdi = index;
 		_if.R.rsi = _if.rsp + sizeof(void*);
     palloc_free_page(file_name);
@@ -390,6 +379,7 @@ process_wait (tid_t child_tid UNUSED) {
 	}
 	sema_down(&child->wait_sema);
 	int exit_status = child->exit_status;
+
 	list_remove(&child->child_elem);
 	sema_up(&child->exit_sema);
 	return exit_status;
@@ -400,26 +390,30 @@ process_wait (tid_t child_tid UNUSED) {
 void process_exit(void)
 {
     struct thread *curr = thread_current();
-    // 1) FDT의 모든 파일을 닫고 메모리를 반환한다.
-    for (int i = 2; i < FDT_COUNT_LIMIT; i++)
-        close(i);
-    palloc_free_page(curr->fd_table);
-    file_close(curr->running); // 2) 현재 실행 중인 파일도 닫는다.
-    process_cleanup();
-    // 3) 자식이 종료될 때까지 대기하고 있는 부모에게 signal을 보낸다.
-    sema_up(&curr->wait_sema);
-    // 4) 부모의 signal을 기다린다. 대기가 풀리고 나서 do_schedule(THREAD_DYING)이 이어져 다른 스레드가 실행된다.
-    sema_down(&curr->exit_sema);
 
+    for (int i = 2; i < FDT_COUNT_LIMIT; i++) {
+			if (curr->fd_table[i] != NULL)
+				close(i);
+		}
+
+    //palloc_free_multiple(curr->fd_table, FDT_PAGES);
+		palloc_free_page(curr->fd_table);
+    file_close(curr->running);
+
+		bool is_exit = true;
+    process_cleanup(is_exit);
+
+    sema_up(&curr->wait_sema);
+    sema_down(&curr->exit_sema);
 }
 
 /* Free the currrent process's resources. */
 static void
-process_cleanup (void) {
+process_cleanup (bool is_exit) {
 	struct thread *curr = thread_current ();
 
 #ifdef VM
-	supplemental_page_table_kill (&curr->spt);
+	supplemental_page_table_kill (&curr->spt, is_exit);
 #endif
 
 	uint64_t *pml4;
@@ -799,6 +793,7 @@ lazy_load_segment (struct page *page, void *aux) {
 
     // 남은 페이지 부분을 0으로 채움
     memset (page->frame->kva + file_info->read_bytes, 0, file_info->zero_bytes);
+		// free(aux) 과정이 필요함!!
 
     return true;
 
