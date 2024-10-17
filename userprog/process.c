@@ -240,10 +240,12 @@ __do_fork (void *aux) {
 			file = file_duplicate(file);
 		current->fd_table[i] = file;
 	}
-
+	current->fd = parent->fd;
 
 	// if child loaded successfully, wake up parent in process_fork
+	lock_acquire(&filesys_lock);
 	sema_up(&current->load_sema);
+	lock_release(&filesys_lock);
 	// process_init ();
 
 	/* Finally, switch to the newly created process. */
@@ -389,11 +391,11 @@ process_wait (tid_t child_tid UNUSED) {
 		return -1;
 	}
 	sema_down(&child->wait_sema);
-	int exit_status = child->exit_status;
 
 	list_remove(&child->child_elem);
 	sema_up(&child->exit_sema);
-	return exit_status;
+
+	return child->exit_status;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -543,10 +545,6 @@ load (const char *file_name, struct intr_frame *if_) {
         printf ("load: %s: open failed\n", file_name);
         goto done;
     }
-
-    t->running = file;
-    file_deny_write(file);
-
     /* Read and verify executable header. */
     if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
             || memcmp (ehdr.e_ident, "\177ELF\2\1\1", 7)
@@ -611,6 +609,11 @@ load (const char *file_name, struct intr_frame *if_) {
                 break;
         }
     }
+
+		
+    t->running = file;
+    file_deny_write(file);
+
 
     /* Set up stack. */
     if (!setup_stack (if_))
@@ -882,10 +885,12 @@ setup_stack (struct intr_frame *if_) {
 	
 		// 2) 할당 받은 페이지에 바로 물리 프레임을 매핑한다.
 		success = vm_claim_page(stack_bottom);
-		if (success)
+		if (success) {
 			// 3) rsp를 변경한다. (argument_stack에서 이 위치부터 인자를 push한다.)
 			if_->rsp = USER_STACK;
 			thread_current()->stack_bottom = stack_bottom;
+
+		}
 	}
 	return success;
 }

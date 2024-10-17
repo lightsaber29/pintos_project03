@@ -139,6 +139,14 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			 close(f->R.rdi);
 			 break;
 
+		case SYS_MMAP:
+			mmap (void *addr, size_t length, int writable, int fd, off_t offset);
+			break;
+		
+		case SYS_MUNMAP:
+			munmap (void *addr);
+			break;
+
 		default:
 			// printf ("system call!\n");
 			// thread_exit ();
@@ -207,19 +215,26 @@ create(const char *filename, unsigned initial_size){
 
 bool
 remove(const char *filename){
+		lock_acquire(&filesys_lock);
     check_address(filename);
-	return filesys_remove(filename);
+		lock_release(&filesys_lock);
+		return filesys_remove(filename);
 }
 
 int open(const char *filename)
 {
 
+	// open_null 테스트 패스 위해
+	if (filename == NULL) {
+		return -1;
+	}
 /* 파일을 open */
 /* 해당 파일 객체에 파일 디스크립터 부여 */
 /* 파일 디스크립터 리턴 */
 /* 해당 파일이 존재하지 않으면-1 리턴 */
     lock_acquire(&filesys_lock);
     check_address(filename);
+
     
     struct file *file = filesys_open(filename);
 
@@ -381,6 +396,19 @@ int fork(const char * thread_name, struct intr_frame *f)
 int wait(int pid)
 {
 	return process_wait(pid);
+}
+
+void *
+mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
+	do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offset);
+
+	// 실패 시 -1?
+	return mapid;
+}
+
+void
+munmap (void *addr) {
+	do_munmap (void *addr);
 }
 
 int 

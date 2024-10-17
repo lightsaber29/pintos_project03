@@ -50,9 +50,12 @@ file_backed_destroy (struct page *page) {
 void *
 do_mmap (void *addr, size_t length, int writable,
 		struct file *file, off_t offset) {
+		// 요구 페이징에 의해 파일 데이터를 메모리로 로드
 }
 
 /* Do the munmap */
 void
 do_munmap (void *addr) {
+
+	// 매핑된 파일의 list에 연결된 모든 엔트리 제거
 }
