@@ -7,12 +7,14 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+
 #include "filesys/filesys.h"
 #include "userprog/process.h"
 #include "filesys/file.h"
 #include "threads/palloc.h"
 
 struct lock filesys_lock;
+
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 struct page *check_address(void *addr);
@@ -63,7 +65,7 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
-    lock_init(&filesys_lock);
+  lock_init(&filesys_lock);
 }
 
 void
@@ -216,18 +218,18 @@ int open(const char *filename)
 /* 해당 파일 객체에 파일 디스크립터 부여 */
 /* 파일 디스크립터 리턴 */
 /* 해당 파일이 존재하지 않으면-1 리턴 */
-    check_address(filename);
     lock_acquire(&filesys_lock);
+    check_address(filename);
     
     struct file *file = filesys_open(filename);
 
     if(file == NULL){
-        return -1;
+			lock_release(&filesys_lock);
+      return -1;
     }
 
     int fd = process_add_file(file);
-
-    if(fd==-1){
+    if(fd == -1){
         file_close(file);
     }
     lock_release(&filesys_lock);
@@ -261,6 +263,7 @@ exec(char *cmd_line){
 
 int read (int fd, void *buffer, unsigned size) 
 {
+	lock_acquire(&filesys_lock);
 	check_address(buffer);
 
 	int read_bytes = 0;
@@ -269,6 +272,7 @@ int read (int fd, void *buffer, unsigned size)
 	unsigned char *buf = buffer;
 
 	if (file == NULL) {	/* if no file in fdt, return -1 */
+		lock_release(&filesys_lock);
 		return -1;
 	}
 
@@ -282,10 +286,11 @@ int read (int fd, void *buffer, unsigned size)
 				break;
 			}
 		}
+		lock_release(&filesys_lock);
 	} else if(file == STDOUT){
+		lock_release(&filesys_lock);
 		return -1;
 	} else{
-		lock_acquire(&filesys_lock);
 		read_bytes = file_read(file,buffer,size);
 		lock_release(&filesys_lock);
 	}
@@ -302,22 +307,25 @@ int read (int fd, void *buffer, unsigned size)
 
 int write(int fd, void *buffer, unsigned size)
 {
+	lock_acquire(&filesys_lock);
 	check_address(buffer);
 	int write_bytes = 0;
 
 	if (fd == STDOUT) {
 		putbuf(buffer, size);		/* to print buffer strings on the display*/
 		write_bytes = size;
+		lock_release(&filesys_lock);
 	}
 	else if (fd == STDIN) {
 		write_bytes = -1;
+		lock_release(&filesys_lock);
 	}
 	else {
 		struct file *file = process_get_file(fd);
 		if (file == NULL) {
+			lock_release(&filesys_lock);
 			return -1;
 		}
-		lock_acquire(&filesys_lock);
 		write_bytes = file_write(file, buffer, size);
 		lock_release(&filesys_lock);
 	}

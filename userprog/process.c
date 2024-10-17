@@ -18,9 +18,9 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+#include "userprog/syscall.h"
 #ifdef VM
 #include "vm/vm.h"
-#include "vm/file.h"
 #endif
 
 static void process_cleanup (bool is_exit);
@@ -219,18 +219,29 @@ __do_fork (void *aux) {
 	if (parent->fd >= MAX_FD)
 		goto error;
 	
-	current->fd_table[0] = parent->fd_table[0]; // stdin
-	current->fd_table[1] = parent->fd_table[1]; // stdout
+	// current->fd_table[0] = parent->fd_table[0]; // stdin
+	// current->fd_table[1] = parent->fd_table[1]; // stdout
 
-	for (int i = 2 ; i < MAX_FD ;i++ ){
-		struct file *f = parent->fd_table[i];
-		if (f == NULL){
+	// for (int i = 2 ; i < MAX_FD ;i++ ){
+	// 	struct file *f = parent->fd_table[i];
+	// 	if (f == NULL){
+	// 		continue;
+	// 	}
+	// 	current->fd_table[i] = file_duplicate(f);
+	// }
+	// current->fd = parent->fd;
+
+	for (int i = 0; i < FDT_COUNT_LIMIT; i++)
+	{
+		struct file *file = parent->fd_table[i];
+		if (file == NULL)
 			continue;
-		}
-		current->fd_table[i] = file_duplicate(f);
+		if (file > 2)
+			file = file_duplicate(file);
+		current->fd_table[i] = file;
 	}
 
-	current->fd = parent->fd;
+
 	// if child loaded successfully, wake up parent in process_fork
 	sema_up(&current->load_sema);
 	// process_init ();

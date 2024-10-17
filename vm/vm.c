@@ -6,6 +6,7 @@
 #include "threads/vaddr.h"
 
 struct list frame_table;
+struct lock frame_table_lock;
 
 /* Initializes the virtual memory subsystem by invoking each subsystem's
  * intialize codes. */
@@ -21,6 +22,7 @@ vm_init (void) {
 	/* TODO: Your code goes here. */
 	// frame_table init
 	list_init(&frame_table);
+	lock_init(&frame_table_lock);
 }
 
 /* Get the type of the page. This function is useful if you want to know the
@@ -61,9 +63,9 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 
 		/* TODO: Create the page, fetch the initialier according to the VM type,*/
 		// 페이지를 생성하고,
-		struct page *p = (struct page *)malloc(sizeof(struct page));
-		// VM 유형에 따라 초기화 함수를 가져와서
+		struct page *new_page = (struct page *)malloc(sizeof(struct page));
 		bool (*page_initializer)(struct page *, enum vm_type, void *);
+		page_initializer = NULL;
 
 		switch (VM_TYPE(type)) {
 		case VM_ANON:
@@ -73,19 +75,23 @@ vm_alloc_page_with_initializer (enum vm_type type, void *upage, bool writable,
 			page_initializer = file_backed_initializer;
 			break;
 		default:
-			// uninit_initialize
-			break;
+			//free(new_page);
+			return false;
 		}
 		/* TODO: and then create "uninit" page struct by calling uninit_new. You
 		 * TODO: should modify the field after calling the uninit_new. */
 		// uninit_new를 호출해 "uninit" 페이지 구조체를 생성하세요.
-		uninit_new(p, upage, init, type, aux, page_initializer);
+		uninit_new(new_page, upage, init, type, aux, page_initializer);
 
 		// uninit_new를 호출한 후에는 필드를 수정해야 합니다.
-		p->writable = writable;
+		new_page->writable = writable;
 
 		/* TODO: Insert the page into the spt. */
-		return spt_insert_page(spt, p);
+		if (!spt_insert_page(spt, new_page)) {
+				//free(new_page);
+				return false;
+		}
+		return true;
 	}
 err:
 	return false;
@@ -124,6 +130,7 @@ spt_find_page (struct supplemental_page_table *spt UNUSED, void *va UNUSED) {
 		// vm_entry 에서 page 를 어떻게 구할까?
 		return hash_entry(found_elem, struct page, hash_elem);
 	} else {
+		//free(page);
 		return NULL;
 	}
 	// return page;
@@ -137,6 +144,8 @@ spt_insert_page (struct supplemental_page_table *spt UNUSED,
 	/* TODO: Fill this function. */
 	if (hash_insert(&spt->page_table, &page->hash_elem) == NULL) {
 		insert_succ = true;
+	} else {
+		//free(page);
 	}
 	return insert_succ;
 }
@@ -192,12 +201,14 @@ vm_get_frame (void) {
 	}
 
 	// 사용자 풀에서 페이지를 성공적으로 가져오면, 프레임을 할당하고 해당 프레임의 멤버를 초기화한 후 반환한다.
-	frame = malloc(sizeof(struct frame));
+	frame = (struct frame *)malloc(sizeof(struct frame));
 	frame->kva = kva;
+	frame->page = NULL;
 
 	// 리스트에 추가
+	lock_acquire(&frame_table_lock);
 	list_push_back(&frame_table, &frame->frame_elem);
-	frame->page = NULL;
+	lock_release(&frame_table_lock);
 
 	ASSERT (frame != NULL);
 	ASSERT (frame->page == NULL);
@@ -254,17 +265,23 @@ vm_try_handle_fault (struct intr_frame *f UNUSED, void *addr UNUSED,
 					rsp = thread_current()->rsp;
 
 			// 스택 확장으로 처리할 수 있는 폴트인 경우, vm_stack_growth를 호출한다.
-			if (USER_STACK - (1 << 20) <= rsp - 8 && rsp - 8 == addr && addr <= USER_STACK)
-					vm_stack_growth(addr);
-			else if (USER_STACK - (1 << 20) <= rsp && rsp <= addr && addr <= USER_STACK)
-					vm_stack_growth(addr);
+			// if (USER_STACK - (1 << 20) <= rsp - 8 && rsp - 8 == addr && addr <= USER_STACK)
+			// 		vm_stack_growth(addr);
+			// else if (USER_STACK - (1 << 20) <= rsp && rsp <= addr && addr <= USER_STACK)
+			// 		vm_stack_growth(addr);
+	// if ((USER_STACK - (1 << 20) <= rsp - 8 && rsp - 8 == addr && addr <= USER_STACK) || 		(USER_STACK - (1 << 20) <= rsp && rsp <= addr && addr <= USER_STACK))
+	// 		vm_stack_growth(addr);
+
+		if (addr <= USER_STACK && addr >= USER_STACK - (1 << 20) && addr >= f->rsp - 8) {
+			vm_stack_growth(addr);
+		}
 
 		page = spt_find_page(spt, addr);
 		if (page == NULL)
 			return false;
 
 		// write 불가능한 페이지에 write 요청한 경우
-		if (write == 1 && page->writable == 0)
+		if (write && !page->writable)
 			return false;
 		return vm_do_claim_page(page);
 	}
