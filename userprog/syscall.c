@@ -13,6 +13,9 @@
 #include "filesys/file.h"
 #include "threads/palloc.h"
 
+#include "userprog/process.h"
+#include "vm/vm.h"
+
 struct lock filesys_lock;
 
 void syscall_entry (void);
@@ -34,6 +37,9 @@ int write (int fd, void *buffer, unsigned size);
 void seek(int fd, unsigned position);
 unsigned tell(int fd);
 void close(int fd);
+
+void *mmap (void *addr, size_t length, int writable, int fd, off_t offset);
+void munmap (void *addr);
 
 void process_close_file(int fd);
 struct file *process_get_file(int fd);
@@ -71,6 +77,17 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
+
+	int arg1 = f->R.rdi; // status, file_name
+	int arg2 = f->R.rsi; // file initial size
+
+	// read의 경우
+	// R.rdi : fd
+	// R.rsi : buffer
+	// R.rdx : size
+	// R.rax : sys_number
+
+	// f->R.rax에는 자식 pid 담기
 
 	int sys_number = f->R.rax;
 	#ifdef VM
@@ -140,11 +157,11 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			 break;
 
 		case SYS_MMAP:
-			mmap (void *addr, size_t length, int writable, int fd, off_t offset);
+			mmap (f->R.rdi, f->R.rsi, f->R.rdx, f->R.rcx, f->R.r8);
 			break;
 		
 		case SYS_MUNMAP:
-			munmap (void *addr);
+			munmap (f->R.rdi);
 			break;
 
 		default:
@@ -400,15 +417,50 @@ int wait(int pid)
 
 void *
 mmap (void *addr, size_t length, int writable, int fd, off_t offset) {
-	do_mmap (void *addr, size_t length, int writable, struct file *file, off_t offset);
+	/*
+	 * 역할: 파일 디스크립터(fd)로 열린 파일의 offset 바이트부터 시작하여 length 바이트를 프로세스의 가상 주소 공간에 addr에 매핑합니다.
+	 * 유의 사항: offset부터 시작하는 파일의 길이가 PGSIZE의 배수가 아니라면 파일의 콘텐츠 너머로 남은 부분은 0으로 설정한다.
+	 * 반환 값: 성공 시 file이 매핑된 가상 주소 / 실패 시 NULL?
+	 * mmap 호출 실패 케이스
+	 * 	* fd로 열린 파일의 파일 길이가 0바이트 길이일 때
+	 *  * addr이 page aligned되어 있지 않을 때 
+	 *  * addr이 NULL / 0이라면 함수 호출 실패. 
+	 *  * 매핑된 페이지의 범위가 기존에 존재하는 매핑된 페이지의 집합에 overlap됐을 때..??
+	 *  * input, output을 나타내는 fd는 mappable하지 않다.
+	 *  * 방법: lazy한 방법으로 할당받기. 페이지를 만들기 위해 vm_alloc_page_with_initializer를 사용하기
+	*/
 
-	// 실패 시 -1?
-	return mapid;
+	/* 인자 체크 (1) addr*/
+	if (addr == NULL || addr == 0 || (uintptr_t)addr & (PGSIZE -1) != 0 || is_kernel_vaddr(addr))
+			return NULL;
+	
+	/* 인자 체크 (2) offset*/
+	if (offset & (PGSIZE -1) != 0)
+			return NULL;
+
+	/* 인자 체크 (3) length */
+	if (length == 0)
+			return NULL;
+
+	/* 인자 체크 (4) fd */
+	if (fd == STDIN || fd == STDOUT)
+			return NULL;
+	
+	/* 인자 체크 (5) 유효한 페이지 */
+	if (spt_find_page(&thread_current()->spt, addr) == NULL)
+			return NULL;
+
+	// mapid 할당, mmap_file 생성 및 초기화, spt에 페이지 삽입, file_reopen()
+	void * mapped_addr = do_mmap (addr, length, writable, thread_current()->fd_table[fd], offset);
+
+	// mapped_addr 반환
+	return mapped_addr;
 }
 
 void
 munmap (void *addr) {
-	do_munmap (void *addr);
+	do_munmap (addr);
+	// mmap의 반환 값
 }
 
 int 
